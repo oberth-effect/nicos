@@ -57,6 +57,7 @@ If not mentioned otherwise, Python packages are available from PyPI
   - gr (optional, for plots, see: http://gr-framework.org/c.html#linux-packages)
   - QScintilla-python (optional, for the script editor component)
     (not installable with pip)
+  - qtmonaco (optional, for the Monaco based script editor, needs Qt 6)
   - scipy (optional, for fitting)
   - cfitsio (optional, required by nicos-livewidget, this not a Python package)
   - python-redmine (optional, for the bug reporting dialog)

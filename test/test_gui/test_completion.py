@@ -28,8 +28,9 @@ from os import path
 
 import pytest
 
-from nicos.clients.gui.completion import Catalog, CodeAssist, \
+from nicos.clients.gui.completion import HEADER, Catalog, CodeAssist, \
     jediCompletions, statusStyle, writeStubs
+from nicos.clients.gui.widgets.monacoeditor import pylspSettings
 from nicos.core import status
 from nicos.guisupport.colors import colors
 from nicos.guisupport.qt import QObject, pyqtSignal
@@ -218,6 +219,40 @@ def test_jedi(stubdir):
     # a device with the name of a class is the device
     assert complete(stubdir, 'Bar.') == ['label', 'value']
     assert {'maw', 'motor', 'mot'} <= set(complete(stubdir, 'm'))
+
+
+def test_language_server(stubdir):
+    """The configuration of the language server, and the header that the
+    page prepends, give the language server the commands and devices."""
+    pytest.importorskip('pylsp')
+    from pylsp import uris
+    from pylsp.config.config import Config
+    from pylsp.plugins import hover, jedi_completion, signature
+    from pylsp.workspace import Workspace
+
+    class Endpoint:
+        def notify(self, *args, **kwds):
+            pass
+
+    root = uris.from_fs_path(stubdir)
+    config = Config(root, {}, 0, {})
+    config.update(pylspSettings(stubdir)['pylsp'])
+    workspace = Workspace(root, Endpoint(), config)
+
+    def document(text, back=0):
+        workspace.put_document('inmemory://model/1', HEADER + text)
+        lines = (HEADER + text).split('\n')
+        return workspace.get_document('inmemory://model/1'), \
+            {'line': len(lines) - 1, 'character': len(lines[-1]) - back}
+
+    items = jedi_completion.pylsp_completions(
+        config, *document('motor.getBars()[0].'))
+    assert [item['label'] for item in items[:2]] == ['label', 'value(factor)']
+    doc = hover.pylsp_hover(config, *document('maw', 1))['contents']['value']
+    assert 'maw(dev, pos, *args)' in doc and 'Move.' in doc
+    help_ = signature.pylsp_signature_help(config, *document('maw(motor, '))
+    assert help_['signatures'][0]['label'] == 'maw(dev, pos, *args)'
+    assert help_['activeParameter'] == 1
 
 
 def test_members(assist):

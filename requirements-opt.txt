@@ -21,4 +21,5 @@ requests_oauthlib>=1.2.0
 opencv-python-headless>=3.0.0,<4.8
 h5py>=2.6
 influxdb-client[async,ciso]>=1.26.0
+qtmonaco>=0.11,<0.12;python_version>='3.10'
 jedi>=0.17.2

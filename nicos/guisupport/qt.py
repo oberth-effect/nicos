@@ -47,10 +47,10 @@ if NICOS_QT == '6':
 
     try:
         from PyQt6 import QtWebEngineCore, QtWebEngineWidgets
-        from PyQt6.QtWebEngineCore import QWebEnginePage
+        from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineScript
         from PyQt6.QtWebEngineWidgets import QWebEngineView
     except (ImportError, RuntimeError):
-        QWebEnginePage = QWebEngineView = None
+        QWebEnginePage = QWebEngineScript = QWebEngineView = None
 
     try:
         from PyQt6 import sip
@@ -93,9 +93,10 @@ else:
 
     try:
         from PyQt5 import QtWebEngineWidgets
-        from PyQt5.QtWebEngineWidgets import QWebEnginePage, QWebEngineView
+        from PyQt5.QtWebEngineWidgets import QWebEnginePage, \
+            QWebEngineScript, QWebEngineView
     except (ImportError, RuntimeError):
-        QWebEnginePage = QWebEngineView = None
+        QWebEnginePage = QWebEngineScript = QWebEngineView = None
 
     try:
         from PyQt5 import QtDBus
