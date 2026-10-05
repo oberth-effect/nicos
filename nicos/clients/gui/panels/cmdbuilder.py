@@ -48,6 +48,13 @@ class CommandPanel(Panel):
       additional Python modules that contain cmdlets and should be loaded.
     * ``add_presets`` (default ``[]``) -- list of tuples consisting of
       additional preset keys and names (e.g. ``[('m', 'monitor counts')]``).
+    * ``completion`` (default ``'daemon'``) -- how Tab completion in the input
+      box works: ``'daemon'`` asks the completer of the daemon, ``'jedi'``
+      completes members (after a dot) with jedi and the catalog of commands and
+      devices of the connected daemon, as the Monaco based script editor does
+      (see :mod:`nicos.clients.gui.completion`), so that e.g. the results of
+      annotated user methods are completed, and leaves everything else to the
+      daemon.  Needs the ``jedi`` package.
     """
 
     panelName = 'Command'
@@ -69,6 +76,11 @@ class CommandPanel(Panel):
 
         self.commandInput.history = self.cmdhistory
         self.commandInput.completion_callback = self.completeInput
+        if options.get('completion') == 'jedi':
+            # imported here only, so that the panel does not depend on it
+            from nicos.clients.gui.completion import lineCompleter
+            self.commandInput.completion_callback = lineCompleter(client,
+                                                                  self.log)
         self.console = None
 
         client.initstatus.connect(self.on_client_initstatus)

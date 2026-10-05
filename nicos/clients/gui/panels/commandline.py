@@ -29,7 +29,18 @@ from nicos.guisupport.utils import setBackgroundColor
 
 
 class CommandLinePanel(Panel):
-    """Provides just an input box for entering commands and no output view."""
+    """Provides just an input box for entering commands and no output view.
+
+    Options:
+
+    * ``completion`` (default ``'daemon'``) -- how Tab completion in the input
+      box works: ``'daemon'`` asks the completer of the daemon, ``'jedi'``
+      completes members (after a dot) with jedi and the catalog of commands and
+      devices of the connected daemon, as the Monaco based script editor does
+      (see :mod:`nicos.clients.gui.completion`), so that e.g. the results of
+      annotated user methods are completed, and leaves everything else to the
+      daemon.  Needs the ``jedi`` package.
+    """
 
     panelName = 'CommandLinePanel'
 
@@ -39,6 +50,11 @@ class CommandLinePanel(Panel):
 
         self.commandInput.history = self.cmdhistory
         self.commandInput.completion_callback = self.completeInput
+        if options.get('completion') == 'jedi':
+            # imported here only, so that the panel does not depend on it
+            from nicos.clients.gui.completion import lineCompleter
+            self.commandInput.completion_callback = lineCompleter(client,
+                                                                  self.log)
 
         client.initstatus.connect(self.on_client_initstatus)
         client.mode.connect(self.on_client_mode)

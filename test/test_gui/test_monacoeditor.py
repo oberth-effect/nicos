@@ -59,6 +59,7 @@ def test_lazy_import():
                'nicos.clients.gui.widgets.monacoeditor',
                'nicos.clients.gui.panels.monacoeditor']
     code = ('import sys\n'
+            'import nicos.clients.gui.panels.cmdbuilder\n'
             'import nicos.clients.gui.panels.commandline\n'
             'import nicos.clients.gui.panels.console\n'
             'import nicos.clients.gui.panels.editor\n'

@@ -29,7 +29,7 @@ from os import path
 import pytest
 
 from nicos.clients.gui.completion import HEADER, Catalog, CodeAssist, \
-    jediCompletions, statusStyle, writeStubs
+    jediCompletions, lineCompleter, sharedCatalog, statusStyle, writeStubs
 from nicos.clients.gui.widgets.monacoeditor import pylspSettings
 from nicos.core import status
 from nicos.guisupport.colors import colors
@@ -361,6 +361,46 @@ def test_daemon_members_jedi(assist):
     assert members('import os\nos.pa', 2, 5) == []
     assert assist.client.asked == []
     assert labels(members('x = unknown()\nx.', 2, 2)) == ['target']
+
+
+def test_complete_line(assist):
+    pytest.importorskip('jedi')
+    complete = assist.completeLine
+    client = assist.client
+    # members are completed by jedi, callables end in a parenthesis
+    assert complete('maw(motor.sp', 'motor.sp') == ['motor.speed']
+    assert complete('motor.getB', 'motor.getB') == ['motor.getBars(']
+    assert complete('x = motor.getBars()[0].va', '0].va') == ['0].value(']
+    # the members of devices beyond their user API once a name is typed,
+    # private ones once it begins with "_"
+    assert complete('motor.', 'motor.') == [
+        'motor.getBars(', 'motor.maw(', 'motor.pair(', 'motor.speed']
+    assert complete('motor.d', 'motor.d') == ['motor.doRead(']
+    assert complete('motor.f', 'motor.f') == ['motor.format(']
+    assert 'motor.__class__' in complete('motor._', 'motor._')
+    assert client.asked == []
+    # everything else, and members of unknown names, by the daemon
+    assert complete('s.', 's.') == ['s.target']
+    assert complete('ma', 'ma') == ['ma.target']
+    assert complete("NewSetup('a.", "a.") == ['a.target']
+    assert client.asked == [('s.', 's.'), ('ma', 'ma'), ("NewSetup('a.", 'a.')]
+
+
+def test_line_completer(assist, monkeypatch):
+    pytest.importorskip('jedi')
+    client = assist.client
+    log = logging.getLogger('test')
+    complete = lineCompleter(client, log)
+    # it completes on the shared catalog of the client, fetched here at once
+    sharedCatalog(client, log).refresh()
+    assert complete('maw(motor.sp', 'motor.sp') == ['motor.speed']
+    assert complete('s.', 's.') == ['s.target']
+
+    # a failure completes nothing
+    def fail(*args, **kwds):
+        raise RuntimeError('lost connection')
+    monkeypatch.setattr(client, 'ask', fail)
+    assert complete('s.', 's.') == []
 
 
 def test_status_style(qapp):

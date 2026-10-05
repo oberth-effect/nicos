@@ -40,7 +40,9 @@ the header (see :mod:`nicos.clients.gui.widgets.monacoeditor`).
 :class:`CodeAssist` adds for one front end what the language server does
 not show: the type of a value in its hover, which jedi in this process
 infers, the description and the current values of a device, and the members
-of names that only the daemon knows, from the daemon's completer.
+of names that only the daemon knows, from the daemon's completer.  The input
+line of a console completes members with jedi in this process, through the
+callback that :func:`lineCompleter` returns.
 
 Daemon requests: the fetch of the catalog (one ``eval``), the cached values
 of a device for its hover (``getcachekeys``) and the daemon's completer
@@ -158,10 +160,25 @@ def sharedCatalog(client, log):
     return catalog
 
 
+def lineCompleter(client, log):
+    """Return the completion callback of a console input line that
+    completes members with jedi, see :meth:`CodeAssist.completeLine`;
+    everything else is completed by the daemon as without it."""
+    assist = CodeAssist(sharedCatalog(client, log))
+
+    def complete(fullstring, lastword):
+        try:
+            return assist.completeLine(fullstring, lastword)
+        except Exception:
+            return []
+    return complete
+
+
 class CodeAssist:
     """What the language server does not show, for one front end: the type
     of a value and the description and current values of a device in their
-    hover, and the members of names that only the daemon knows.
+    hover, the members of names that only the daemon knows, and the
+    completion of a console line.
 
     The methods may be called from another thread than that of the catalog;
     tooltips are Markdown with HTML.
@@ -273,6 +290,33 @@ class CodeAssist:
                     'snippet': bool(paren),
                 })
         return items
+
+    def completeLine(self, fullstring, lastword):
+        """Return the completions of a console line as the replacements of
+        *lastword*, like the daemon's completer: callables end in '('.
+
+        Members, after a dot, are completed by jedi; everything else, and
+        what jedi does not know, by the daemon's completer.  As in the
+        editor, the members of devices beyond their user API are offered
+        only once a name is typed, private members once it begins with "_".
+        """
+        if match := re.search(r'\.(\w*)$', fullstring):
+            prefix = match.group(1)
+            stem = lastword.removesuffix(prefix)
+            matches = []
+            for c in jediCompletions(self.catalog.stubdir, fullstring, 1,
+                                     len(fullstring)):
+                api = self.catalog.apis.get(
+                    (c.full_name or '').rpartition('.')[0])
+                if c.type == 'path' or \
+                   c.name.startswith('_') and not prefix.startswith('_') or \
+                   api is not None and c.name not in api and not prefix:
+                    continue
+                matches.append(stem + c.name + (
+                    '(' if c.type in ('function', 'class') else ''))
+            if matches:
+                return matches
+        return self.client.ask('complete', fullstring, lastword, default=[])
 
     def _deviceInfo(self, name):
         """Return the current value, target, status and limits of a device

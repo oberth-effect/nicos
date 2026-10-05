@@ -55,6 +55,13 @@ class ConsolePanel(Panel):
       and warnings.
     * ``watermark`` (default empty) -- the path to an image file that should
       be used as a watermark in the console window.
+    * ``completion`` (default ``'daemon'``) -- how Tab completion in the input
+      box works: ``'daemon'`` asks the completer of the daemon, ``'jedi'``
+      completes members (after a dot) with jedi and the catalog of commands and
+      devices of the connected daemon, as the Monaco based script editor does
+      (see :mod:`nicos.clients.gui.completion`), so that e.g. the results of
+      annotated user methods are completed, and leaves everything else to the
+      daemon.  Needs the ``jedi`` package.
     """
 
     panelName = 'Console'
@@ -71,6 +78,11 @@ class ConsolePanel(Panel):
         self.outView.setActionLabel(self.actionLabel)
         self.commandInput.history = self.cmdhistory
         self.commandInput.completion_callback = self.completeInput
+        if options.get('completion') == 'jedi':
+            # imported here only, so that the panel does not depend on it
+            from nicos.clients.gui.completion import lineCompleter
+            self.commandInput.completion_callback = lineCompleter(client,
+                                                                  self.log)
         self.grepNoMatch.setVisible(False)
         self.actionAllowLineWrap.setChecked(self.mainwindow.allowoutputlinewrap)
 
