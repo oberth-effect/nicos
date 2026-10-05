@@ -874,9 +874,20 @@ class Session:
     def getExportedObjects(self):
         """Return an iterable of all objects exported to the NICOS namespace.
         """
-        for name in self._exported_names:
+        for name in list(self._exported_names):
             if name in self.namespace:
                 yield name, self.namespace[name]
+
+    def getNamespaceInfo(self):
+        """Return information about the user commands and devices exported to
+        the user namespace, for completion in script editors: Python stub
+        modules for jedi and some data about the commands and devices.
+
+        The result contains only plain Python types, so that it can be sent
+        to clients.  See :mod:`nicos.core.sessions.introspect`.
+        """
+        from nicos.core.sessions.introspect import describeNamespace
+        return describeNamespace(self)
 
     def applyAliasConfig(self, new_config, prev_config):
         """Apply the desired aliases from self.alias_config."""

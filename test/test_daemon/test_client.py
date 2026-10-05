@@ -242,3 +242,13 @@ def test_devices_values(client):
     load_setup(client, 'daemontest')
     assert client.getDeviceValuetype('dm1') == float
     assert client.getDeviceValue('dm1') == 0.
+
+
+def test_namespace_info(client):
+    load_setup(client, 'daemontest')
+    info = client.eval('session.getNamespaceInfo()')
+    assert 'maw' in [cmd['name'] for cmd in info['commands']]
+    devices = {dev['name']: dev for dev in info['devices']}
+    assert 'dax: _nicos_types.' in info['stubs']['nicos_session.py']
+    assert 'NICOS moveable %s' % devices['dax']['class'] in \
+        info['stubs']['_nicos_types.py']
