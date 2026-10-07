@@ -137,6 +137,12 @@ class FakeClient(QObject):
         return {'value': 1.5, 'target': 2, 'unit': 'mm', 'fmtstr': '%.2f',
                 'status': (200, 'idle'), 'userlimits': (-50, 50)}
 
+    def getDeviceParam(self, devname, param):
+        # the cache has a key named like a method too, as "status"
+        values = {'motor': {'speed': 2.5, 'note': 'x' * 300,
+                            'maw': 'not a parameter'}}
+        return values.get(devname, {}).get(param)
+
 
 @pytest.fixture
 def assist(qapp):
@@ -296,6 +302,7 @@ def test_type_hover(assist):
     and the docstring of names that jedi infers no value or several for,
     which the language server does not document."""
     pytest.importorskip('jedi')
+    assist.livevalues = False  # the values of parameters: see below
 
     def hover(text, before, word):
         lines = text.split('\n')
@@ -328,6 +335,34 @@ def test_type_hover(assist):
     assert hover('if x:\n    def f():\n        "F1."\nelse:\n'
                  '    def f():\n        "F2."\nf', '', 'f') is None
     assert hover('unknown', '', 'unknown') is None
+
+
+def test_parameter_hover(assist):
+    """The current value of a parameter of a device, from the cache."""
+    pytest.importorskip('jedi')
+
+    def hover(text, before, word):
+        lines = text.split('\n')
+        return assist.hover(text, len(lines), len(lines[-1]) - 1,
+                            before, word)
+
+    assert hover('motor.speed', 'motor.', 'speed') == \
+        '```python\nspeed: float\n```\n\n<p><b>Value:</b> 2.5</p>'
+    # of the aliased device for an alias, also inside an expression
+    assert hover('maw(mot.speed', 'maw(mot.', 'speed').endswith(
+        '\n\n<p><b>Value:</b> 2.5</p>')
+    # long values are shortened
+    value = hover('motor.note', 'motor.', 'note').rpartition('\n\n')[2]
+    assert value.startswith("<p><b>Value:</b> 'xxx") and '...' in value
+    assert len(value) < 130
+    # not for methods, whatever the cache has, and not for other values
+    assert hover('motor.maw', 'motor.', 'maw') is None
+    assert hover('x = motor\nx.speed', 'x.', 'speed') == \
+        '```python\nspeed: float\n```'
+    # not without live values
+    assist.livevalues = False
+    assert hover('motor.speed', 'motor.', 'speed') == \
+        '```python\nspeed: float\n```'
 
 
 def test_daemon_members(assist):

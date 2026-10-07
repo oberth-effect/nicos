@@ -39,20 +39,22 @@ language server that qtmonaco runs, configured for the stub directory and
 the header (see :mod:`nicos.clients.gui.widgets.monacoeditor`).
 :class:`CodeAssist` adds for one front end what the language server does
 not show: the type of a value in its hover, which jedi in this process
-infers, the description and the current values of a device, and the members
-of names that only the daemon knows, from the daemon's completer.  The input
+infers, the description and the current values of a device, the current
+value of a parameter, and the members of names that only the daemon knows,
+from the daemon's completer.  The input
 line of a console completes members with jedi in this process, through the
 callback that :func:`lineCompleter` returns.
 
 Daemon requests: the fetch of the catalog (one ``eval``), the cached values
-of a device for its hover (``getcachekeys``) and the daemon's completer
-(``complete``).
+of a device or a parameter for its hover (``getcachekeys``) and the daemon's
+completer (``complete``).
 """
 
 import atexit
 import html
 import os
 import re
+import reprlib
 import shutil
 import tempfile
 import threading
@@ -80,6 +82,10 @@ DOTTED_NAME = re.compile(r'(?<![\w.)\]])([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)'
 
 # jedi's caches are not thread safe
 _jediLock = threading.Lock()
+
+# the values of parameters in hovers, long ones shortened
+_valueRepr = reprlib.Repr()
+_valueRepr.maxstring = _valueRepr.maxother = 100
 
 
 class Catalog(QObject):
@@ -188,7 +194,7 @@ class CodeAssist:
         self.catalog = catalog
         self.client = catalog.client
         self.daemoncomplete = True  # members of unknown names from the daemon
-        self.livevalues = True      # show the values of a device in its hover
+        self.livevalues = True      # values from the cache in hovers
 
     def hover(self, text, line, column, before, word):
         """Return what to add to the hover of the language server for
@@ -199,9 +205,10 @@ class CodeAssist:
         values their type, as jedi infers it, e.g. ``bars: list[Bar]``, and
         the docstring of a name that the language server cannot document,
         since jedi infers no value or several for it, e.g. a parameter of a
-        device whose type is a union or has no Python equivalent.
-        Functions, classes and modules are left to the language server,
-        which shows their signature.
+        device whose type is a union or has no Python equivalent; for a
+        parameter of a device, also its current value.  Functions, classes
+        and modules are left to the language server, which shows their
+        signature.
         """
         device = None if before.endswith('.') else \
             self.catalog.devices.get(word)
@@ -213,7 +220,22 @@ class CodeAssist:
         if not (hint or doc):
             return None
         return '\n\n'.join(
-            [fence('%s: %s' % (word, hint) if hint else word)] + doc)
+            [fence('%s: %s' % (word, hint) if hint else word)] + doc +
+            self._paramValue(before, word))
+
+    def _paramValue(self, before, word):
+        """Return the current value of the parameter *word* of the device
+        named before the dot that ends *before*, from the cache, as
+        paragraphs; none for other values, or without live values."""
+        match = DOTTED_NAME.search(before)
+        device = self.catalog.devices.get(match.group(1)) if match else None
+        if device is None or not self.livevalues:
+            return []
+        value = self.client.getDeviceParam(device['alias'] or match.group(1),
+                                           word)
+        if value is None:
+            return []
+        return ['<p><b>Value:</b> %s</p>' % escape(_valueRepr.repr(value))]
 
     def _deviceHover(self, name, device):
         header = '%s: %s' % (name, device['class'].rpartition('.')[2])

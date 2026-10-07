@@ -128,7 +128,8 @@ class MonacoSettingsDialog(QDialog):
          'attributes of the object; for a device this includes its volatile '
          'parameters.'),
         ('livevalues', 'Show current device values in tooltips',
-         'Value, target, status and limits from the cache'),
+         'Value, target, status and limits of a device, and the value of a '
+         'parameter, from the cache'),
         ('wordsuggest', 'Suggest words of the document', ''),
         ('snippets', 'Suggest code snippets', ''),
         ('typos', 'Match suggestions despite small typos',
